@@ -1,5 +1,8 @@
 import os
 import pickle
+
+os.chdir('/home/yz979/code/kaggle-perturbation/')
+
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Union
@@ -90,7 +93,13 @@ def get_go_auto(gene_list, data_path):
         return edge_df
 
 
-def get_coexpress_auto(adata, threshold=0.5):
+def get_coexpress_auto(adata, data_path, threshold=0.5):
+    data_path.mkdir(parents=True, exist_ok=True)
+    gc_path = os.path.join(data_path, 'coexpression.csv')
+
+    if os.path.exists(gc_path):
+        return pd.read_csv(gc_path)
+    
     df = adata.to_df()
     gene_names = df.columns
     
@@ -105,6 +114,7 @@ def get_coexpress_auto(adata, threshold=0.5):
                 edges.append((gene_names[i], gene_names[j], cor_matrix.iloc[i, j]))
     
     edge_df = pd.DataFrame(edges, columns=['source', 'target', 'importance'])
+    edge_df.to_csv(gc_path, index=False)
     return edge_df
 
 def gene_sim_network(
@@ -138,7 +148,7 @@ def gene_sim_network(
     if network_type == 'go':
         edge_list = get_go_auto(gene_list, data_path)
     elif network_type == 'coexpression':
-        edge_list = get_coexpress_auto(adata, threshold)
+        edge_list = get_coexpress_auto(adata, data_path, threshold)
 
     network = GeneSimNetwork.from_edges(edge_list, gene_list, node_map)
     return network
@@ -175,15 +185,13 @@ class GeneSimNetwork():
             if n not in G.nodes():
                 G.add_node(n)
 
+        to_remove = []
         for n in G.nodes():
             if n not in gene_list:
-                G.remove_node(n)
-
-        for e in G.edges():
-            assert e[0] in node_map, f"{e[0]} not in node_map"
-            assert e[1] in node_map, f"{e[1]} not in node_map"
-            assert node_map[e[0]] is not None, f"{e[0]} not in node_map"
-            assert node_map[e[1]] is not None, f"{e[1]} not in node_map"
+                to_remove.append(n)
+        
+        for n in to_remove:
+            G.remove_node(n)
 
         edge_index_ = [(node_map[e[0]], node_map[e[1]]) for e in G.edges]
 
@@ -195,17 +203,10 @@ class GeneSimNetwork():
         
         return cls(G, edge_index, edge_weight)
 
-    def __len__(self):
-        return len(self.G.nodes)
-
-    def __getitem__(self, idx):
-        return self.G.nodes[idx]
-    
-    def __contains__(self, item):
-        return item in self.G.nodes
-    
-    def __iter__(self):
-        return iter(self.G.nodes)
-    
-    def __repr__(self):
-        return self.G.__repr__()
+if __name__ == '__main__':
+    adata_path = 'data/adata_train.h5ad'
+    de_path = 'data/de_train.h5ad'
+    adata = anndata.read_h5ad(adata_path)
+    de_train = anndata.read_h5ad(de_path)
+    node_map = {i: j for i, j in zip(de_train.var.index, range(len(de_train.var)))}
+    coexpress_network = gene_sim_network(adata.var.index, node_map, 'coexpression', adata=adata, data_path='data')
