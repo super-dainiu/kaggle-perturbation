@@ -93,7 +93,7 @@ def get_go_auto(gene_list, data_path):
         return edge_df
 
 
-def get_coexpress_auto(adata, data_path, threshold=0.5):
+def get_coexpress_auto(adata, data_path, threshold=0.1):
     data_path.mkdir(parents=True, exist_ok=True)
     gc_path = os.path.join(data_path, 'coexpression.csv')
 
@@ -123,7 +123,7 @@ def gene_sim_network(
     network_type: str,
     adata: anndata.AnnData = None,
     data_path: str = './data',
-    threshold: float = 0.5,
+    threshold: float = 0.1,
 ) -> "GeneSimNetwork":
     """
     Get gene similarity network
@@ -208,5 +208,5 @@ if __name__ == '__main__':
     de_path = 'data/de_train.h5ad'
     adata = anndata.read_h5ad(adata_path)
     de_train = anndata.read_h5ad(de_path)
-    node_map = {i: j for i, j in zip(de_train.var.index, range(len(de_train.var)))}
-    coexpress_network = gene_sim_network(adata.var.index, node_map, 'coexpression', adata=adata, data_path='data')
+    node_map = {i: j for i, j in zip(de_train.var, range(len(de_train.var)))}
+    coexpress_network = gene_sim_network(adata.var, node_map, 'coexpression', adata=adata, data_path='data/grn')
